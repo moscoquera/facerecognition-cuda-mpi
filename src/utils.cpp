@@ -6,8 +6,8 @@
 
 
 
-double* matMult(double* A_n_m,double* B_m_p, int n, int m, int p){
-	double* AB = (double*)malloc(sizeof(double)*p*n);
+void matMult(double* A_n_m,double* B_m_p, int n, int m, int p, double* AB){
+
 
 	for(int r=0;r<n;r++){
 		for(int c=0;c<p;c++){
@@ -18,14 +18,13 @@ double* matMult(double* A_n_m,double* B_m_p, int n, int m, int p){
 		}
 	}
 
-	return AB;
 
 }
 
 
-void project(double *W_d_n,int d,int n, double *X_Xn_d,int Xn, double* mu_d, double * &projected_Xn_n){
+void project(double *W_d_n,int d,int n, double *X_Xn_d,int Xn, double* mu_d, double * projected_Xn_n){
 	if (mu_d==NULL){
-		projected_Xn_n=matMult(X_Xn_d,W_d_n,Xn,d,n);
+		matMult(X_Xn_d,W_d_n,Xn,d,n,projected_Xn_n);
 		return;
 	}
 	double* Xmu_Xn_d = (double*)malloc(sizeof(double)*d*Xn);
@@ -37,7 +36,7 @@ void project(double *W_d_n,int d,int n, double *X_Xn_d,int Xn, double* mu_d, dou
 	//Xmu difiere cuando se suman las columnas posiblemente por la larga cantidad de sumas, porque los valores
 	//de las celdas coinciden
 
-	projected_Xn_n=matMult(Xmu_Xn_d,W_d_n,Xn,d,n);
+	matMult(Xmu_Xn_d,W_d_n,Xn,d,n,projected_Xn_n);
 	free(Xmu_Xn_d);
 }
 
@@ -45,7 +44,8 @@ void project(double *W_d_n,int d,int n, double *X_Xn_d,int Xn, double* mu_d, dou
 void reconstruct(double *W,int d,int n, double *Y, double* mu, double * &reconstructed){
 	double *Wt;
 	transponer(W,Wt,d,n);
-	reconstructed = matMult(Y,Wt,1,n,d);
+	reconstructed=(double*)malloc(sizeof(double)*1*d);
+	matMult(Y,Wt,1,n,d,reconstructed);
 	if (mu!=NULL){
 		for(int i=0;i<d;i++){
 			*(reconstructed+i)=*(reconstructed+i)+*(mu+i);

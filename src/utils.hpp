@@ -46,8 +46,8 @@ void transponer(T* data,T * &out,int rows,int cols){
 }
 
 
-double* matMult(double* A,double* B, int n, int m, int p);
-void project(double *W,int d,int n, double *X,int Xn, double* mu, double * &projected);
+void matMult(double* A,double* B, int n, int m, int p,double *);
+void project(double *W,int d,int n, double *X,int Xn, double* mu, double * projected);
 void reconstruct(double *W,int d,int n, double *Y, double* mu, double * &reconstructed);
 
 double* columnMean(double* X,int rows, int cols );

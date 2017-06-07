@@ -54,7 +54,8 @@ int pca(double *X_n_d,int num_components,int n, int d, double* &eigenvectors_d_n
 		eigenvectors  =(double*)malloc(sizeof(double)*d*d);
 		memset(eigenvalues,0,d*sizeof(double));
 		memset(eigenvectors,0,d*d*sizeof(double));
-		C = matMult(Xmt,Xm,d,n,d);
+		C = (double*)malloc(sizeof(double)*d*d);
+		matMult(Xmt,Xm,d,n,d,C);
 
 		memcpy(eigenvectors,C,sizeof(double)*d*d);
 		LAPACKE_dsyevd(LAPACK_ROW_MAJOR,jobz,uplo,d,eigenvectors,d,eigenvalues);
@@ -63,8 +64,8 @@ int pca(double *X_n_d,int num_components,int n, int d, double* &eigenvectors_d_n
 		eigenvectors  =(double*)malloc(sizeof(double)*n*n);
 		memset(eigenvalues,0,n*sizeof(double));
 		memset(eigenvectors,0,n*n*sizeof(double));
-
-		C = matMult(Xm,Xmt,n,d,n);
+		C = (double*)malloc(sizeof(double)*n*n);
+		matMult(Xm,Xmt,n,d,n,C);
 
 		memcpy(eigenvectors,C,sizeof(double)*n*n);
 		int res =LAPACKE_dsyevd(LAPACK_ROW_MAJOR,jobz,uplo,n,eigenvectors,n,eigenvalues);
@@ -72,7 +73,8 @@ int pca(double *X_n_d,int num_components,int n, int d, double* &eigenvectors_d_n
 
 
 		double* eigenvectorsTmp = eigenvectors;
-		eigenvectors = matMult(Xmt,eigenvectors,d,n,n);
+		eigenvectors = (double*)malloc(sizeof(double)*d*n);
+		matMult(Xmt,eigenvectorsTmp,d,n,n,eigenvectors);
 		free(eigenvectorsTmp);
 
 
@@ -196,15 +198,10 @@ int lda(double *X_n_d,int* y_n,int n,int &num_components, int d, double* &eigenv
 			*(meanClassTotal+c)=(*(meanClass+c))-(*(meanTotal+c));
 		}
 
-		double fun;
-		for(int r=0;r<XiSize*d;r++){
-				fun=*(Ximean+r);
-				printf("%.6f\n",fun);
-		}
-
 
 		transponer(Ximean,XimeanT,XiSize,d);
-		XimeanT_Ximean= matMult(XimeanT,Ximean,d,XiSize,d);
+		XimeanT_Ximean=(double*)malloc(sizeof(double)*d*d);
+		matMult(XimeanT,Ximean,d,XiSize,d,XimeanT_Ximean);
 /*
 		double fun;
 		for(int r=0;r<XiSize;r++){
@@ -217,7 +214,8 @@ int lda(double *X_n_d,int* y_n,int n,int &num_components, int d, double* &eigenv
 		}*/
 
 
-		meansDot=matMult(meanClassTotal,meanClassTotal,d,1,d);
+		meansDot=(double*)malloc(sizeof(double)*d*d);
+		matMult(meanClassTotal,meanClassTotal,d,1,d,meansDot);
 		//meansDot=matMult(meanClassTotal,meanClassTotal,1,d,1); //debe dar un escalar
 		//printf(" %.15f\n",*(meansDot));
 		for(int Si=0;Si<d*d;Si++){
@@ -250,7 +248,8 @@ int lda(double *X_n_d,int* y_n,int n,int &num_components, int d, double* &eigenv
 
 
 
-	SwSb=matMult(Sw,Sb,d,d,d);
+	SwSb=(double*)malloc(sizeof(double)*d*d);
+	matMult(Sw,Sb,d,d,d,SwSb);
 
 
 	double* eigenvalues = (double*)malloc(sizeof(double)*d);
@@ -298,12 +297,12 @@ int fisherfaces(double* X_n_d,int* y_n,int num_components,int n, int d, double* 
 	}
 
 
+	int ncpca=(n-c.size());
+
 
 	double *eigenvalues_ncpca_pca,*eigenvectors_d_ncpca_pca,*mu_d_pca;
 	double *eigenvalues_lda_num,*eigenvectors_lda_ncpca_num;
-	double *eigenpca_project_n_ncpca;
-
-	int ncpca=(n-c.size());
+	double *eigenpca_project_n_ncpca = (double*)malloc(sizeof(double)*n*ncpca);
 
 
 	pca(X_n_d,ncpca,n,d,eigenvectors_d_ncpca_pca,eigenvalues_ncpca_pca,mu_d_pca);
@@ -324,7 +323,8 @@ int fisherfaces(double* X_n_d,int* y_n,int num_components,int n, int d, double* 
 
 	//printf("%f %f\n",*(eigenvalues_lda_num),*(eigenvectors_lda_ncpca_num));
 
-	eigenvectors=matMult(eigenvectors_d_ncpca_pca,eigenvectors_lda_ncpca_num,d,ncpca,lda_num);
+	eigenvectors=(double*)malloc(sizeof(double)*d*lda_num);
+	matMult(eigenvectors_d_ncpca_pca,eigenvectors_lda_ncpca_num,d,ncpca,lda_num,eigenvectors);
 	eigenvalues=eigenvalues_lda_num;
 	mean=mu_d_pca;
 	nfaces=lda_num;

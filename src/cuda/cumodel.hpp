@@ -24,8 +24,10 @@ public:
 EigenfacesModel(int d, void (*dist_metric)(cudaStream_t stream,double *, double *,double*, int));
 ~EigenfacesModel();
 virtual void compute(double*  X, int* y, int n);
-virtual void predict(double *X, int &faceClass,int &faceIdx);
+virtual double predict(double *X, int &faceClass,int &faceIdx);
 virtual double * reconstructProjection(int i);
+virtual void save(char*);
+	virtual void load(char*);
 protected:
 	cublasHandle_t blasHandler;
 	cusolverDnHandle_t cusolverHandler;
@@ -41,8 +43,10 @@ public:
 	FisherfacesModel(int d, void (*dist_metric)(cudaStream_t stream,double *, double *,double*, int));
 	~FisherfacesModel();
 	virtual void compute(double*  X, int* y, int n);
-		virtual void predict(double *X, int &faceClass,int &faceIdx);
+		virtual double predict(double *X, int &faceClass,int &faceIdx);
 		virtual double * reconstructProjection(int i);
+		virtual void save(char*);
+			virtual void load(char*);
 protected:
 	cublasHandle_t blasHandler;
 	cusolverDnHandle_t cusolverHandler;

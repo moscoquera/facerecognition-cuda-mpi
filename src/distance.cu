@@ -33,16 +33,16 @@ void CosineDistance(double *p, double *q,double *res, int n){
 		transponer(p,pt,1,n);
 		transponer(q,qt,1,n);
 
-		double * ptq = matMult(pt,q,1,n,1);
-		double * ppt = matMult(p,pt,1,n,1);
-		double * qqt = matMult(q,qt,1,n,1);
+		double ptq;
+		matMult(pt,q,1,n,1,&ptq);
+		double ppt;
+		matMult(p,pt,1,n,1,&ppt);
+		double qqt;
+		matMult(q,qt,1,n,1,&qqt);
 
-		*(res) = (-1*(*ptq))/sqrt((*ppt)*(*qqt));
+		*(res) = (-1*ptq)/sqrt(ppt*qqt);
 		free(pt);
 		free(qt);
-		free(ptq);
-		free(ppt);
-		free(qqt);
 
 
 }

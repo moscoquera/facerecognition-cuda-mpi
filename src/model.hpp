@@ -17,7 +17,7 @@ public:
 	int num_components;
 protected:
 	void (*dist_metric)(cudaStream_t stream,double *, double *,double*, int);
-	double** projections;
+	double* projections;
 	int nprojections;
 	double* W;
 	double* mu;
@@ -29,8 +29,10 @@ public:
 	BaseModel(int d, void (*dist_metric)(cudaStream_t stream,double *, double *,double*, int));
 	virtual ~BaseModel();
 	virtual void compute(double* X, int* y, int n);
-	virtual void predict(double *X, int &faceClass,int &faceIdx);
+	virtual double predict(double *X, int &faceClass,int &faceIdx);
 	virtual double * reconstructProjection(int i);
+	virtual void save(char*);
+	virtual void load(char*);
 
 };
 
@@ -40,6 +42,8 @@ public:
 	EigenfacesModel(int d, void (*dist_metric)(cudaStream_t stream,double *, double *,double*, int));
 	~EigenfacesModel();
 	virtual void compute(double*  X, int* y, int n);
+	virtual void save(char*);
+	virtual void load(char*);
 };
 
 
@@ -51,8 +55,10 @@ public:
 	FisherfacesModel(int d, void (*dist_metric)(cudaStream_t stream,double *, double *,double*, int));
 	~FisherfacesModel();
 	virtual void compute(double*  X, int* y, int n);
-	virtual void predict(double *X, int &faceClass,int &faceIdx);
+	virtual double predict(double *X, int &faceClass,int &faceIdx);
 	virtual double * reconstructProjection(int i);
+	virtual void save(char*);
+	virtual void load(char*);
 };
 
 

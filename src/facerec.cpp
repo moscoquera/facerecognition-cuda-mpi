@@ -556,13 +556,79 @@ void detectAndDisplay( Mat frame, BaseModel* model, std::vector<char*> Subjects)
   imshow( window_name, frame );
  }
 
+void detectAndDisplayMPI( Mat frame, int nodes)
+{
+  std::vector<Rect> faces;
+  Mat frame_gray;
+
+  cvtColor( frame, frame_gray, CV_BGR2GRAY );
+  equalizeHist( frame_gray, frame_gray );
+
+  //-- Detect faces
+  face_cascade.detectMultiScale( frame_gray, faces, 1.1, 2, 0|CV_HAAR_SCALE_IMAGE, Size(30, 30) );
+
+  MPI_Status status;
+  std::vector<char*> names;
+  for (size_t i=0;i<faces.size();i++){
+
+	Mat imageData = frame(faces[i]);
+	Mat face(height,width,CV_8UC1);
+	cv::resize(imageData,face,face.size(),0,0,INTER_LINEAR);
+	cv::Mat f(height,width,DataType<double>::type);
+	face.convertTo(f,DataType<double>::type,1,0);
+
+	int size=width*height;
+	for(int node=1;node<nodes;node++){
+		MPI_Send(&size,1,MPI_INT,node,1,MPI_COMM_WORLD);
+		MPI_Send(f.data,width*height,MPI_DOUBLE,node,2,MPI_COMM_WORLD);
+	}
+	double best=DBL_MAX;
+	double predval;
+	char* predClass,*bestclass;
+	for(int node=1;node<nodes;node++){
+		MPI_Recv(&predval,1,MPI_DOUBLE,MPI_ANY_SOURCE,3,MPI_COMM_WORLD,&status);
+		predClass=(char*)malloc(sizeof(char)*100);
+		MPI_Recv(predClass,100,MPI_CHAR,status.MPI_SOURCE,3,MPI_COMM_WORLD,&status);
+
+		if (predval<best){
+			best=predval;
+			bestclass=predClass;
+		}
+
+	}
+
+	names.push_back(bestclass);
+
+  }
+
+  int fontFace = FONT_HERSHEY_PLAIN;
+	double fontScale = 1;
+	int thickness = 1;
+	Scalar txtColor(0,0,255);
+
+  for( size_t i = 0; i < faces.size(); i++ )
+  {
+    Point center( faces[i].x + faces[i].width*0.5, faces[i].y + faces[i].height*0.5 );
+    ellipse( frame, center, Size( faces[i].width*0.5, faces[i].height*0.5), 0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
+
+    int baseline=0;
+	Size textSize = getTextSize(names.at((int)i), fontFace,fontScale, thickness, &baseline);
+	baseline+=thickness;
+	putText(frame,names.at((int)i),center,fontFace,fontScale,txtColor,thickness,8,false);
+
+  }
+  //-- Show what you got
+  imshow( window_name, frame );
+ }
 
 int main(int argc, char* argv[])
 {
 	bool useCuda=false;
 	bool test=false;
 	bool camera=false;
-	int mpirank;
+	bool save=false;
+	bool load=false;
+	int mpirank=0;
 	int mpi=0;
 	char* method="pca";
 	bool train=false;
@@ -585,6 +651,10 @@ int main(int argc, char* argv[])
 			test=true;
 		}else if (strcmp("-camera",argv[i])==0){
 			camera=true;
+		}else if (strcmp("-load",argv[i])==0){
+			load=true;
+		}else if (strcmp("-save",argv[i])==0){
+			save=true;
 		}else if (strcmp("-mpi",argv[i])==0){
 			MPI_Init(&argc,&argv);
 			MPI_Comm_size(MPI_COMM_WORLD, &mpi);
@@ -612,6 +682,12 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	int samples=0;
+	double* ImagesData;
+	int* ImagesLabels;
+	std::vector<char*> Subjects;
+
+
 	if (mpi>0 && mpirank==0){ //primer nodo de hace nada
 		if (train){
 			int toreceive=mpi-1;
@@ -626,7 +702,82 @@ int main(int argc, char* argv[])
 			}
 			printf("total samples: %d\n",totalsamples);
 		}
+
+		if (test){
+			CHECK_RETURN(read_images(dataset,ImagesData,ImagesLabels,Subjects,width,height,samples));
+			MPI_Status status;
+			for(int i=0;i<50;i++){
+				int test = rand()%samples;
+				double* imgdata = ImagesData+(test*width*height);
+				int size=width*height;
+				for(int node=1;node<mpi;node++){
+					MPI_Send(&size,1,MPI_INT,node,1,MPI_COMM_WORLD);
+					MPI_Send(imgdata,width*height,MPI_DOUBLE,node,2,MPI_COMM_WORLD);
+				}
+				double best=DBL_MAX;
+				double predval;
+				char* predClass,*bestclass;
+				for(int node=1;node<mpi;node++){
+					MPI_Recv(&predval,1,MPI_DOUBLE,MPI_ANY_SOURCE,3,MPI_COMM_WORLD,&status);
+					predClass=(char*)malloc(sizeof(char)*100);
+					MPI_Recv(predClass,100,MPI_CHAR,status.MPI_SOURCE,3,MPI_COMM_WORLD,&status);
+
+					if (predval<best){
+						best=predval;
+						bestclass=predClass;
+					}
+
+				}
+
+
+				printf("Prediction: %s expected: %s\n",bestclass,Subjects.at(*(ImagesLabels+test)));
+
+			}
+			for(int node=1;node<mpi;node++){
+				int size=0;
+				MPI_Send(&size,1,MPI_INT,node,1,MPI_COMM_WORLD);
+			}
+		}
+
+		if (camera){
+				VideoCapture cap(0);
+			   cap.open(-1);
+			   Mat frame;
+
+			   //-- 1. Load the cascades
+			   if( !face_cascade.load( face_cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
+			   if( !eyes_cascade.load( eyes_cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
+
+			   //-- 2. Read the video stream
+			   if( cap.isOpened() )
+			   {
+				 while( true )
+				 {
+				 cap >> frame;
+
+			   //-- 3. Apply the classifier to the frame
+				   if(!frame.empty() )
+				   {
+					   detectAndDisplayMPI(frame,mpi);
+				   }
+				   else
+				   { printf(" --(!) No captured frame -- Break!"); break; }
+
+				   int c = waitKey(10);
+				   if( (char)c == 'c' ) { break; }
+				  }
+				 for(int node=1;node<mpi;node++){
+					int size=0;
+					MPI_Send(&size,1,MPI_INT,node,1,MPI_COMM_WORLD);
+				}
+			   }else{
+				   printf("Error opening camera\n");
+			   }
+			}
+
 	}
+
+
 
 	if ((mpi>0 && mpirank>0) || mpi==0){ //si no es mpi o un nodo diferente al primero
 		BaseModel* model;
@@ -645,11 +796,15 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		int samples=0;
-		double* ImagesData;
-		int* ImagesLabels;
-		std::vector<char*> Subjects;
 
+		char dataname[512];
+		sprintf(dataname,"/tmp/facerec_%s_%d.bin",method,mpirank);
+
+		if (load){
+			model->load(dataname);
+			CHECK_RETURN(read_images(dataset,ImagesData,ImagesLabels,Subjects,width,height,samples));
+
+		}
 
 
 		if (train){
@@ -661,13 +816,38 @@ int main(int argc, char* argv[])
 			CHECK_RETURN(read_images(dataset,ImagesData,ImagesLabels,Subjects,width,height,samples));
 			model->num_components=samples;
 			model->compute(ImagesData,ImagesLabels,samples);
+
+			printf("done %d\n",mpirank);
+
 			if (mpi){
 				MPI_Send(&samples,1,MPI_INT,0,0,MPI_COMM_WORLD);
 			}
 
 
 		}
-		if (test){
+
+		if ((test || camera) && mpi>0){
+			int size=0;
+			MPI_Status status;
+			double* imgdata;
+			while(true){
+				MPI_Recv(&size,1,MPI_INT,0,1,MPI_COMM_WORLD,&status);
+				if (size==0){
+					break;
+				}
+				imgdata = (double*)malloc(sizeof(double)*size);
+				MPI_Recv(imgdata,size,MPI_DOUBLE,0,2,MPI_COMM_WORLD,&status);
+				int pred;
+				int predIdx;
+				double dist =model->predict(imgdata,pred,predIdx);
+				MPI_Send(&dist,1,MPI_DOUBLE,0,3,MPI_COMM_WORLD);
+				MPI_Send(Subjects.at(pred),100,MPI_CHAR,0,3,MPI_COMM_WORLD);
+				free(imgdata);
+
+			}
+		}
+
+		if (test && mpi==0){
 			std::vector<Mat> images;
 			for(int i=0;i<50;i++){
 				int test = rand()%samples;
@@ -698,7 +878,12 @@ int main(int argc, char* argv[])
 			waitKey(0);*/
 		}
 
-	if (camera && mpi==0){ //no puede ser sobre el cluster
+		if (save){
+			model->save(dataname);
+		}
+
+
+	if (camera && mpi==0){
 		VideoCapture cap(0);
 	   cap.open(-1);
 	   Mat frame;
