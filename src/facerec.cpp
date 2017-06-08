@@ -691,6 +691,7 @@ int main(int argc, char* argv[])
 
 	if (mpi>0 && mpirank==0){ //primer nodo de hace nada
 		if (train){
+			clock_t trainStart=clock();
 			int toreceive=mpi-1;
 			int samples;
 			int totalsamples=0;
@@ -701,12 +702,15 @@ int main(int argc, char* argv[])
 				printf("node %d, samples: %d\n",status.MPI_SOURCE,samples);
 				totalsamples+=samples;
 			}
+			clock_t trainEnd=clock();
 			printf("total samples: %d\n",totalsamples);
+			printf("Train time %d: %f\n",mpirank,((float)trainEnd-(float)trainStart)/CLOCKS_PER_SEC);
 		}
 
 		if (test){
 			CHECK_RETURN(read_images(dataset,ImagesData,ImagesLabels,Subjects,width,height,samples));
 			MPI_Status status;
+			clock_t testStart=clock();
 			for(int i=0;i<50;i++){
 				int test = rand()%samples;
 				double* imgdata = ImagesData+(test*width*height);
@@ -734,10 +738,12 @@ int main(int argc, char* argv[])
 				printf("Prediction: %s expected: %s\n",bestclass,Subjects.at(*(ImagesLabels+test)));
 
 			}
+			clock_t testEnd = clock();
 			for(int node=1;node<mpi;node++){
 				int size=0;
 				MPI_Send(&size,1,MPI_INT,node,1,MPI_COMM_WORLD);
 			}
+			printf("Test time %d: %f\n",mpirank,((float)testEnd-(float)testStart)/CLOCKS_PER_SEC);
 		}
 
 		if (camera){
@@ -815,10 +821,11 @@ int main(int argc, char* argv[])
 			}
 
 			CHECK_RETURN(read_images(dataset,ImagesData,ImagesLabels,Subjects,width,height,samples));
+			clock_t trainStart=clock();
 			model->num_components=samples;
 			model->compute(ImagesData,ImagesLabels,samples);
-
-			printf("done %d\n",mpirank);
+			clock_t trainEnd=clock();
+			printf("Train time %d: %f\n",mpirank,((float)trainEnd-(float)trainStart)/CLOCKS_PER_SEC);
 
 			if (mpi){
 				MPI_Send(&samples,1,MPI_INT,0,0,MPI_COMM_WORLD);
@@ -850,6 +857,7 @@ int main(int argc, char* argv[])
 
 		if (test && mpi==0){
 			std::vector<Mat> images;
+			clock_t testStart=clock();
 			for(int i=0;i<50;i++){
 				int test = rand()%samples;
 				double* imgdata = ImagesData+(test*width*height);
@@ -873,6 +881,8 @@ int main(int argc, char* argv[])
 				images.push_back(labelImage(face,(char**)labels,3,20));
 
 			}
+			clock_t testEnd=clock();
+			printf("Test time %d: %f\n",mpirank,((float)testEnd-(float)testStart)/CLOCKS_PER_SEC);
 			/*Mat faces = makeCanvas(images,640,640/images.at(0).rows);
 			namedWindow( "Reconstruct", WINDOW_AUTOSIZE );// Create a window for display.
 			imshow( "Reconstruct", faces );
@@ -920,7 +930,7 @@ int main(int argc, char* argv[])
 	}
 
 	clock_t endTime=clock();
-	printf("elapsed time: %fs\n",((float)(endTime-startTime))/CLOCKS_PER_SEC);
+	printf("elapsed time %d: %fs\n",mpirank,((float)(endTime-startTime))/CLOCKS_PER_SEC);
 
 	if (mpi){
 		MPI_Finalize();
