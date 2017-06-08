@@ -32,7 +32,7 @@
 using namespace std;
 using namespace cv;
 
-const int width=92,height=112;
+const int width=256,height=484;
 
 static void CheckErrorAux (const char *, unsigned, const char *, int);
 
