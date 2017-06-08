@@ -630,7 +630,7 @@ int main(int argc, char* argv[])
 	bool load=false;
 	int mpirank=0;
 	int mpi=0;
-	char* method="pca";
+	char* method=(char*)"pca";
 	bool train=false;
 	char* dataset=0;
 	for(int i=0;i<argc;i++){
@@ -687,6 +687,7 @@ int main(int argc, char* argv[])
 	int* ImagesLabels;
 	std::vector<char*> Subjects;
 
+	clock_t startTime = clock();
 
 	if (mpi>0 && mpirank==0){ //primer nodo de hace nada
 		if (train){
@@ -918,9 +919,14 @@ int main(int argc, char* argv[])
 	delete model;
 	}
 
+	clock_t endTime=clock();
+	printf("elapsed time: %fs\n",((float)(endTime-startTime))/CLOCKS_PER_SEC);
+
 	if (mpi){
 		MPI_Finalize();
 	}
+
+
 
 	return 0;
 }
